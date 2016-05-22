@@ -17,22 +17,24 @@ using namespace std; // Use the standard namespace, so I don't have to reference
 #pragma region Global Variables and Constants
 
 // Window dimensions
-GLuint WIDTH = 640, HEIGHT = 480;
+GLfloat lastFrameTime = 0;
+GLuint WIDTH = 512, HEIGHT = 512;
 
 // Shaders
-const GLchar* vertexShaderSource =
+const GLchar* vertexShaderSource = 
 "#version 330 core\n"
-"layout (location = 0) in vec3 position;\n"
+"layout(location = 0) in vec3 position;\n"
 "void main()\n"
 "{\n"
-"gl_Position = vec4(position.x, position.y, position.z, 1.0);\n"
-"}\0";
+"gl_Position = vec4(position, 1.0);\n"
+"}\n\0";
 const GLchar* fragmentShaderSource =
 "#version 330 core\n"
 "out vec4 color;\n"
+"uniform vec4 ourColor;"
 "void main()\n"
 "{\n"
-"color = vec4(1.0f, 1.0f, 1.0f, 1.0f);\n"
+"color = ourColor;\n"
 "}\n\0";
 
 #pragma endregion
@@ -77,6 +79,7 @@ int main()
 	// Set the required callback functions
 	glfwSetKeyCallback(window, key_callback); // Set the key_callback.
 	glfwSetWindowSizeCallback(window, window_size_callback); // Set the window_size_callback.
+	//glfwSwapInterval(0);
 
 	// Tell GLEW to use a modern approach to retrieving function pointers and extensions.
 	glewExperimental = GL_TRUE;
@@ -141,29 +144,48 @@ int main()
 
 	// Set up vertex data, buffers, and attribute pointers.
 	GLfloat vertices[] = {
-		-0.5f, -0.5f, 0.0f, // The left vertex;
-		0.5f, -0.5f, 0.0f, // The right vertex;
-		0.0f,  0.5f, 0.0f  // The top vertex.
+		0.2f,  0.2f, 0.0f,  // Top Right
+		0.2f, -0.8f, 0.0f,  // Bottom Right
+		-0.8f, -0.8f, 0.0f,  // Bottom Left
+		-0.8f,  0.2f, 0.0f,   // Top Left
+
+		0.8f,  0.8f, 0.0f,  // Top Right
+		0.8f, -0.2f, 0.0f,  // Bottom Right
+		-0.2f, -0.2f, 0.0f,  // Bottom Left
+		-0.2f,  0.8f, 0.0f   // Top Left
 	};
-	GLuint VBO, VAO; // Declare the vertex buffer object and vertex array object.
+	GLuint indices[] = {  // Set up indice data.
+		0, 1, 3,   // First triangle
+		1, 2, 3,   // Second triangle
+		4, 5, 7,
+		5, 6, 7
+	};
+	GLuint VBO, VAO, EBO; // Declare the vertex buffer object and vertex array object.
 	glGenVertexArrays(1, &VAO); // Generate 1 vertex array object.
 	glGenBuffers(1, &VBO); // Generate 1 vertex buffer object.
+	glGenBuffers(1, &EBO); // Generate 1 element buffer object.
 
 	// Bind the VAO, then bind and set the vertex buffer and attribute pointer.
 	glBindVertexArray(VAO); // Bind the vertex array object.
 
 	glBindBuffer(GL_ARRAY_BUFFER, VBO); // Bind the vertex array buffer and vertex buffer object.
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW); // Load the vertices as static vertices.
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO); // Bind the EBO.
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW); // Load the indices as static indices.
 
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0); // Tell OpenGL how to interpret the vertices.
 	glEnableVertexAttribArray(0); // Enable the vertex attribute array, size 0.
 
-	// Call the attribute pointer with the previously registered VBO, so the buffer object can be unbound later.
+	// Call the attribute pointer with the previously registered VBO and EBO, so the buffer object can be unbound later.
 	glBindBuffer(GL_ARRAY_BUFFER, 0); 
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 
 	glBindVertexArray(0); // Unbind the vertex array object (response to bug #2, project Deltashot).
 
 	#pragma endregion
+
+	// Wireframe Mode
+	// glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
 	#pragma region Main Loop
 	while (!glfwWindowShouldClose(window)) // While the game window should remain open
@@ -171,6 +193,14 @@ int main()
 		glfwPollEvents(); // Check if any events have been called.
 
 		// Render everything:
+		GLfloat timeValue = (float)glfwGetTime();
+		GLfloat timeSinceLastFrame = timeValue - lastFrameTime;
+		lastFrameTime = timeValue;
+		
+		GLfloat greenValue = (float)(sin(timeValue) / 2.0f) + 0.5f;
+		GLint vertexColorLocation = glGetUniformLocation(shaderProgram, "ourColor");
+		glUseProgram(shaderProgram);
+		glUniform4f(vertexColorLocation, greenValue, greenValue, greenValue, 1.0f);
 
 		// Set the clear colour, and clear the buffers.
 		glClearColor(0.529f, 0.808f, 0.980f, 1.0f); // Set the clear colour.
@@ -179,7 +209,7 @@ int main()
 		// Draw a triangle.
 		glUseProgram(shaderProgram); // Use the shader program.
 		glBindVertexArray(VAO); // Bind the vertex array object.
-		glDrawArrays(GL_TRIANGLES, 0, 3); // Draw three vertices, starting from vertex 0.
+		glDrawElements(GL_TRIANGLES, sizeof(indices), GL_UNSIGNED_INT, 0); // Draw the vertices.
 		glBindVertexArray(0); // Bind to the (only) vertex array.
 
 		glfwSwapBuffers(window); // Swap the buffers.
